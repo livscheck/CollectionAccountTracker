@@ -1,7 +1,7 @@
 services:
   sql:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    platform: linux.amd64
+    platform: linux/amd64
     container_name: collections-sql
     environment:
       ACCEPT_EULA: "Y"
