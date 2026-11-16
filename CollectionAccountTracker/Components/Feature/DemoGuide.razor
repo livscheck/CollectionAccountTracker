@@ -1,0 +1,118 @@
+@using System.Text.Json
+@inject IJSRuntime JS
+
+@* Demo checklist fixed to the screen on every page. Checked steps and open/closed are saved in the
+   browser's localStorage, so they survive page changes and refreshes. *@
+
+@if (!isOpen)
+{
+    <button type="button" class="btn btn-dark shadow position-fixed bottom-0 end-0 m-3 z-3"
+            aria-expanded="false" @onclick="() => SetOpenAsync(true)">
+        Demo steps <span class="badge text-bg-light ms-1">@checkedSteps.Count/@Steps.Length</span>
+    </button>
+}
+else
+{
+    <aside class="position-fixed top-0 end-0 h-100 bg-body border-start shadow z-3 d-flex flex-column"
+           style="width: min(24rem, 100vw)" aria-label="Demo steps">
+        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+            <h2 class="h5 mb-0">Demo steps <span class="text-body-secondary fs-6">@checkedSteps.Count/@Steps.Length</span></h2>
+            <button type="button" class="btn-close" aria-label="Close" @onclick="() => SetOpenAsync(false)"></button>
+        </div>
+
+        <div class="overflow-auto p-3 flex-grow-1">
+            @foreach (var (step, index) in Steps.Select((s, i) => (s, i)))
+            {
+                @if (step.Section != null)
+                {
+                    <h3 class="h6 text-uppercase text-body-secondary small mt-3 mb-2">@step.Section</h3>
+                }
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="demo-step-@index"
+                           checked="@checkedSteps.Contains(index)" @onchange="() => ToggleAsync(index)" />
+                    <label class="form-check-label @(checkedSteps.Contains(index) ? "text-decoration-line-through text-body-secondary" : "")"
+                           for="demo-step-@index">
+                        <strong>@step.Title</strong>
+                    </label>
+                    <div class="small text-body-secondary">
+                        @step.Hint
+                        @if (step.Link != null)
+                        {
+                            <a href="@step.Link" class="ms-1">Go →</a>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="p-3 border-top">
+            <button type="button" class="btn btn-outline-secondary btn-sm w-100" @onclick="ResetAsync">Uncheck all</button>
+        </div>
+    </aside>
+}
+
+@code {
+    private const string StorageKey = "demo-guide";
+
+    private record DemoStep(string Title, string Hint, string? Link = null, string? Section = null);
+
+    // Mirrors the README's demo section
+    private static readonly DemoStep[] Steps =
+    [
+        new("App running", "Docker Desktop open, docker compose up -d, then dotnet run. One browser tab open.", null, "Before"),
+        new("Explain the business problem", "The firm keeps a contingency fee and owes the rest to the creditor. Each month it sends a remittance.", "remittance", "Demo"),
+        new("Search and filter accounts", "Type a name, pick a status or click a stat card. Filtering runs in SQL through the API.", "accounts"),
+        new("Open an account", "Click a debtor's name: route parameter, then GET /api/accounts/{id}."),
+        new("Try to overpay", "Enter more than the balance. The red message comes from the API, which enforces the rules."),
+        new("Post a $100 payment", "Point at the live fee preview. The fee is calculated on the server and stored."),
+        new("Show the remittance went up", "That creditor's collected, fee and net all increased.", "remittance"),
+        new("Pay off an account", "Sort by Balance, open the smallest, pay it exactly. Status flips to Paid.", "accounts"),
+        new("Walk through the code", "Open How It Works → Add a payment: form → DTO → API client → controller.", "backend#payment", "Code"),
+        new("Search: IQueryable and no N+1", "How It Works → Search accounts: one SQL query built from optional filters.", "backend#search"),
+        new("Remittance: GroupBy in SQL", "How It Works → Monthly remittance: SelectMany, GroupBy and Sum run in the database.", "backend#remittance")
+    ];
+
+    private HashSet<int> checkedSteps = [];
+    private bool isOpen;
+
+    private record SavedState(bool IsOpen, int[] Checked);
+
+    // localStorage is only reachable once the component is running in the browser connection
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        var json = await JS.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+        if (json != null && JsonSerializer.Deserialize<SavedState>(json) is { } saved)
+        {
+            isOpen = saved.IsOpen;
+            checkedSteps = [.. saved.Checked];
+            StateHasChanged();
+        }
+    }
+
+    private async Task SetOpenAsync(bool open)
+    {
+        isOpen = open;
+        await SaveAsync();
+    }
+
+    private async Task ToggleAsync(int index)
+    {
+        if (!checkedSteps.Remove(index))
+            checkedSteps.Add(index);
+        await SaveAsync();
+    }
+
+    private async Task ResetAsync()
+    {
+        checkedSteps.Clear();
+        await SaveAsync();
+    }
+
+    private async Task SaveAsync() =>
+        await JS.InvokeVoidAsync("localStorage.setItem", StorageKey,
+            JsonSerializer.Serialize(new SavedState(isOpen, [.. checkedSteps])));
+}

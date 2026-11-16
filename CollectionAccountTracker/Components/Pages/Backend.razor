@@ -1,0 +1,174 @@
+@page "/backend"
+@* No @rendermode: the page is just text and code, so plain server rendering is enough *@
+
+<PageTitle>How It Works</PageTitle>
+
+<h1 class="fw-bold">How it works</h1>
+<p class="text-body-secondary">
+    Each section is something you can do in the app, and the code behind it, step by step from the page to the database.
+    The code is read from the real files, so it's always what's running.
+</p>
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    @foreach (var (kind, color) in KindColors)
+    {
+        <span class="badge text-bg-@color">@kind</span>
+    }
+</div>
+
+<nav class="d-flex flex-wrap gap-2 mb-4">
+    @foreach (var action in Actions)
+    {
+        <a href="backend#@action.Id" class="btn btn-sm btn-outline-secondary">@action.Title</a>
+    }
+</nav>
+
+@foreach (var action in Actions)
+{
+    <section id="@action.Id" class="card mb-4">
+        <div class="card-header bg-body-tertiary">
+            <h2 class="h5 mb-0">@action.Title</h2>
+            <div class="small text-body-secondary">@action.Summary</div>
+        </div>
+        <div class="card-body">
+            @foreach (var step in action.Steps)
+            {
+                <div class="mb-4">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <span class="badge text-bg-@KindColors[step.Kind]">@step.Kind</span>
+                        <strong>@step.Fundamental</strong>
+                        <span class="small font-monospace text-body-secondary">@step.File</span>
+                    </div>
+                    <p class="mb-2">@step.Explanation</p>
+                    <pre class="border rounded mb-0"><code class="language-@step.Language">@step.Code</code></pre>
+                </div>
+            }
+        </div>
+    </section>
+}
+
+@code {
+    private static readonly Dictionary<string, string> KindColors = new()
+    {
+        ["Blazor"] = "primary",
+        ["REST API"] = "success",
+        ["LINQ"] = "warning"
+    };
+
+    private record DemoAction(string Id, string Title, string Summary, Step[] Steps);
+
+    // One step of an action: the code between the first line containing Start and the next line containing End
+    private record Step(string Kind, string Fundamental, string Explanation, string File, string Start, string End)
+    {
+        public string Code { get; } = Extract(File, Start, End);
+        public string Language => File.EndsWith(".razor") && !Start.Contains("Task") && !Start.Contains("[Parameter]")
+            && !Start.StartsWith("//") ? "html" : "csharp";
+    }
+
+    // The source files are copied next to the app at build time (see the .csproj)
+    private static string Extract(string file, string start, string end)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, file);
+        if (!File.Exists(path))
+            return $"// {file} wasn't found.";
+
+        var lines = File.ReadAllLines(path);
+        var from = Array.FindIndex(lines, l => l.Contains(start));
+        var to = from < 0 ? -1 : Array.FindIndex(lines, from, l => l.Contains(end));
+        if (to < 0)
+            return $"// Snippet not found in {file}.";
+
+        // Remove the shared indentation so snippets start at the left edge
+        var snippet = lines[from..(to + 1)];
+        var indent = snippet.Where(l => l.Trim().Length > 0).Min(l => l.Length - l.TrimStart().Length);
+        return string.Join("\n", snippet.Select(l => l.Length >= indent ? l[indent..] : l.TrimStart()));
+    }
+
+    // Static: the files are read once, the first time anyone opens the page
+    private static readonly DemoAction[] Actions =
+    [
+        new("search", "Search accounts", "Type a debtor or creditor name and the list updates as you type.",
+        [
+            new("Blazor", "Data binding",
+                "@bind keeps the input and the search field in sync. :event=\"oninput\" updates on every keystroke, and :after reloads the list once the value changes.",
+                "Components/Pages/Accounts.razor", "<input id=\"account-search\"", "@bind=\"search\""),
+            new("Blazor", "Calling the API from a component",
+                "The page asks the API client for data; it never touches the database. The version check stops a slow, older response from overwriting a newer one.",
+                "Components/Pages/Accounts.razor", "private async Task LoadAccountsAsync()", "accounts = results;"),
+            new("REST API", "GET with a query string",
+                "GET /api/accounts?search=smith&status=SUIT. ASP.NET fills search and status from the URL because they're method parameters.",
+                "Controllers/AccountsController.cs", "// GET /api/accounts?search", "GetAll(string? search"),
+            new("LINQ", "Building an IQueryable",
+                "Each .Where is only added when its filter was given. Nothing runs until ToListAsync, which sends ONE SQL query. COUNT and MAX become subqueries in it, so there's no N+1.",
+                "Controllers/AccountsController.cs", "IQueryable<Account> query = db.Accounts;", ".ToListAsync();")
+        ]),
+
+        new("filter", "Filter by status", "Pick a status from the dropdown, or click a stat card. The two stay in sync.",
+        [
+            new("Blazor", "Binding a dropdown",
+                "The select is bound to the same statusCode field as the cards, and reloads the list after it changes.",
+                "Components/Pages/Accounts.razor", "<select id=\"account-status\"", "</select>"),
+            new("Blazor", "Parameters and EventCallback (child → parent)",
+                "StatCard doesn't know about filtering. It only reports \"I was clicked\" through an EventCallback; the page decides what that means.",
+                "Components/Common/StatCard.razor", "// Optional. The card only reports", "public bool IsSelected"),
+            new("Blazor", "Handling the event in the page",
+                "The page passes IsSelected and OnClick to each card. Clicking the selected card again clears the filter.",
+                "Components/Pages/Accounts.razor", "private async Task FilterByStatusAsync", "await LoadAccountsAsync();")
+        ]),
+
+        new("dashboard", "Stat cards", "The count and remaining balance per status, plus what was collected this month.",
+        [
+            new("REST API", "One endpoint for a summary",
+                "GET /api/accounts/dashboard returns everything the cards need in one request.",
+                "Services/AccountAPIClient.cs", "public async Task<DashboardDTO?> GetDashboardAsync()", "api/accounts/dashboard"),
+            new("LINQ", "GroupBy in SQL, then in memory",
+                "GroupBy status runs in SQL and returns one row per status. Sorting by workflow order runs in memory afterwards, because SQL can't read the C# AccountStatus list.",
+                "Controllers/AccountsController.cs", "[HttpGet(\"dashboard\")]", "return new DashboardDTO")
+        ]),
+
+        new("account", "Open an account", "Click a debtor's name to see the account and its payment history.",
+        [
+            new("Blazor", "Routing with a parameter",
+                "The {AccountId:int} in the route fills the AccountId parameter. OnParametersSetAsync reloads if the id in the URL changes.",
+                "Components/Pages/AccountDetail.razor", "// OnParametersSetAsync (not", "loaded = true;"),
+            new("REST API", "GET one resource, or 404",
+                "GET /api/accounts/5 returns the account, or NotFound() if there isn't one. The client turns 404 into null so the page can show \"Account not found\".",
+                "Services/AccountAPIClient.cs", "public async Task<AccountDetailDTO?> GetAccountAsync", "ReadFromJsonAsync<AccountDetailDTO>"),
+            new("LINQ", "A nested projection",
+                "Select builds exactly what the page needs, including the payments newest first, in one query with JOINs. Status is selected whole and read after the query, because EF can't translate .Code into SQL.",
+                "Controllers/AccountsController.cs", "[HttpGet(\"{id:int}\")]", "return NotFound();")
+        ]),
+
+        new("payment", "Add a payment", "Enter an amount and method on an account. Overpaying is rejected; paying off exactly marks the account Paid.",
+        [
+            new("Blazor", "Forms and validation",
+                "EditForm with DataAnnotationsValidator checks the rules before submitting. @bind-Value connects each input to the model, and OnValidSubmit only runs when the form is valid.",
+                "Components/Pages/AccountDetail.razor", "<EditForm Model=", "</EditForm>"),
+            new("Blazor", "One set of rules for the form and the API",
+                "The same [Required] and [Range] attributes are checked by the form and by the API. It's a class, not a record, because the form fills it in as the user types.",
+                "Models/DTO/CreatePaymentDTO.cs", "public class CreatePaymentDTO", "public PaymentMethod? Method"),
+            new("Blazor", "Submitting and reloading",
+                "The page sends the payment, shows the API's message, then reloads the account so balance, history and status all come from the server.",
+                "Components/Pages/AccountDetail.razor", "private async Task PostPaymentAsync()", "isPosting = false;"),
+            new("REST API", "POST to a nested resource",
+                "POST /api/accounts/5/payments: the URL says the payment belongs to account 5. Errors come back as a message instead of an exception.",
+                "Services/AccountAPIClient.cs", "public async Task<string?> AddPaymentAsync", "return await ReadErrorAsync(response);"),
+            new("REST API", "Status codes and server-side rules",
+                "404 if the account doesn't exist, 400 if the payment is more than the balance, 201 Created on success. The fee is calculated and stored, and the payment, balance and status are saved in one SaveChangesAsync.",
+                "Controllers/AccountsController.cs", "[HttpPost(\"{id:int}/payments\")]", "payment.Method));")
+        ]),
+
+        new("remittance", "Monthly remittance", "Pick a month to see, per creditor, what was collected, the firm's fee and the net owed.",
+        [
+            new("Blazor", "Two-way binding on your own component",
+                "@bind-Month works on MonthPicker because it has a Month parameter and a MonthChanged EventCallback. MonthPicker only reports the month; the page reloads the report.",
+                "Components/Common/MonthPicker.razor", "[Parameter]", "await MonthChanged.InvokeAsync(Month);"),
+            new("REST API", "Optional query parameters and validation",
+                "GET /api/remittance?year=2026&month=11. Both default to this month, and an invalid month returns 400.",
+                "Controllers/RemittanceController.cs", "// GET /api/remittance?year", "return BadRequest("),
+            new("LINQ", "SelectMany, GroupBy and Sum in SQL",
+                "SelectMany turns accounts into payment rows that carry their creditor. GroupBy and Sum run in SQL, so only one row per creditor comes back. It sums the stored FirmFee, so past months never change.",
+                "Controllers/RemittanceController.cs", "var lines = await db.Accounts", ".ToListAsync();")
+        ])
+    ];
+}

@@ -1,20 +1,19 @@
 ﻿@inherits LayoutComponentBase
+@using CollectionAccountTracker.Components.Feature
 
 <div class="page">
     <div class="sidebar">
         <NavMenu />
     </div>
-
     <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-        </div>
-
-        <article class="content px-4">
+        <article class="content px-4 px-sm-5 pb-5">
             @Body
         </article>
     </main>
 </div>
+
+@* In the layout so it's on every page. Interactive on its own because the layout itself isn't. *@
+<DemoGuide @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.

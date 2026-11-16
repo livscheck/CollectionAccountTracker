@@ -1,0 +1,52 @@
+@page "/about"
+@* No @rendermode: the page is just text, so plain server rendering is enough *@
+@using Markdig
+@using Markdig.Syntax
+@using Markdig.Syntax.Inlines
+
+<PageTitle>About</PageTitle>
+
+<article class="col-xl-9">
+    @ReadmeHtml.Value
+</article>
+
+@code {
+    // Renders the repo's README.md, so this page and GitHub always show the same text.
+    // Lazy: the file is read and converted once, the first time anyone opens the page.
+    private static readonly Lazy<MarkupString> ReadmeHtml = new(RenderReadme);
+
+    private static MarkupString RenderReadme()
+    {
+        // Copied next to the app at build time (see the README.md item in the .csproj)
+        var path = Path.Combine(AppContext.BaseDirectory, "README.md");
+        if (!File.Exists(path))
+            return new MarkupString("<p>README.md wasn't found.</p>");
+
+        // Advanced extensions turn on tables; UseBootstrap adds Bootstrap classes (e.g. .table) to the HTML
+        var pipeline = new MarkdownPipelineBuilder().UseAdvancedExtensions().UseBootstrap().Build();
+        var document = Markdown.Parse(File.ReadAllText(path), pipeline);
+
+        RemoveRepoLinks(document);
+
+        return new MarkupString(document.ToHtml(pipeline));
+    }
+
+    // Links like "Scripts/ResetDemoData.sql" point at files in the repo. They work on GitHub
+    // but would be broken links inside the app, so keep their text and drop the link.
+    private static void RemoveRepoLinks(MarkdownDocument document)
+    {
+        var repoLinks = document.Descendants<LinkInline>()
+            .Where(link => !link.IsImage && !Uri.IsWellFormedUriString(link.Url, UriKind.Absolute))
+            .ToList();
+
+        foreach (var link in repoLinks)
+        {
+            while (link.FirstChild is { } child)
+            {
+                child.Remove();
+                link.InsertBefore(child);
+            }
+            link.Remove();
+        }
+    }
+}
