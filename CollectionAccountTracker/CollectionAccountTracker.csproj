@@ -1,10 +1,30 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>09fdbc3f-2337-41ce-b109-f4700710b1d3</UserSecretsId>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Markdig" Version="1.6.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.QuickGrid" Version="10.0.15" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.15" />
+  </ItemGroup>
+
+  <!-- The repo's README lives one folder up; copy it next to the app so the About page can show it -->
+  <ItemGroup>
+    <None Include="..\README.md" Link="README.md" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- Copy the source the How It Works page quotes next to the app, so it shows the code that's actually running -->
+  <ItemGroup>
+    <None Include="Controllers\*.cs;Services\*.cs;Models\DTO\CreatePaymentDTO.cs"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Components\Pages\Accounts.razor;Components\Pages\AccountDetail.razor;Components\Common\StatCard.razor;Components\Common\MonthPicker.razor"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
 </Project>
