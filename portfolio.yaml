@@ -1,0 +1,45 @@
+# Portfolio metadata. Your portfolio site reads this file.
+# Validate by running /portfolio-sync (plugin: github.com/livscheck/portfolio-sync)
+
+# --- Required -------------------------------------------------------------
+title: Collection Account Tracker
+slug: collection-account-tracker
+tagline: Posts debtor payments, works out a law firm's contingency fee, and reports what each creditor is owed each month
+type: web
+status: maintenance
+
+stack:
+  languages: [C#, Razor, SQL]
+  frameworks: [Blazor (.NET 10), ASP.NET Core Web API, Entity Framework Core 10, Bootstrap 5.3, QuickGrid]
+  tools: [SQL Server 2022, Docker, Markdig, highlight.js]
+
+media:
+  hero: media/hero.png
+  hero_alt: Accounts page with color-coded status cards, search and status filter, and a sortable list of debts
+  diagram: media/architecture.png
+  gallery: media/gallery/           # account detail with payment form, monthly remittance, How It Works code page
+
+# --- Optional -------------------------------------------------------------
+published: true
+featured: false
+date_start: "11/12/2026"
+date_end: null
+last_updated: "11/16/2026"
+tags: [rest-api, database]
+
+components:
+  - name: Blazor UI
+    path: CollectionAccountTracker/Components/
+    stack: [Blazor Interactive Server, Bootstrap, QuickGrid]
+  - name: REST API
+    path: CollectionAccountTracker/Controllers/
+    stack: [ASP.NET Core Web API, LINQ]
+  - name: Data layer
+    path: CollectionAccountTracker/Data/
+    stack: [Entity Framework Core, SQL Server]
+
+links:
+  repo: https://github.com/livscheck/CollectionAccountTracker
+  demo: null
+  video: null
+  writeup: null
