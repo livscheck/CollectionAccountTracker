@@ -1,0 +1,13 @@
+@using CollectionAccountTracker.Models
+
+@* Colored pill showing an account status, e.g. "Placed". Accepts the status name or code.
+   Each status gets its own color from app.css, e.g. "status-suit". *@
+<span class="badge rounded-pill fw-normal fs-6 status-badge status-@Code">@Text</span>
+
+@code {
+    [Parameter, EditorRequired]
+    public string? Text { get; set; }
+
+    private string? Code =>
+        AccountStatus.All.FirstOrDefault(s => s.Name == Text || s.Code == Text)?.Code.ToLowerInvariant();
+}

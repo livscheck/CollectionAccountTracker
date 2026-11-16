@@ -1,0 +1,107 @@
+﻿@page "/accounts"
+@* prerender: false so data loads once. With prerendering on, OnInitializedAsync runs twice
+   (server prerender, then again when the live connection starts), calling the API twice. *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AccountAPIClient Api
+@using CollectionAccountTracker.Components.Common
+@using CollectionAccountTracker.Components.Feature
+@using CollectionAccountTracker.Models
+
+<PageTitle>Accounts</PageTitle>
+
+<h1 class="fw-bold mb-4">Accounts</h1>
+
+@if (dashboard != null)
+{
+    <p class="fs-5">
+        <strong>Collected this month:</strong> @dashboard.CollectedThisMonth.ToString("C")
+    </p>
+
+    <div class="row row-cols-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4">
+        @foreach (var status in CardStatuses)
+        {
+            var summary = SummaryFor(status);
+            <StatCard StatTag="@status.Name"
+                      Stats="@([new Stat { Label = "accounts", Value = summary.Count.ToString() }])"
+                      StatBalance="@summary.TotalBalance"
+                      IsSelected="@(statusCode == status.Code)"
+                      OnClick="@(() => FilterByStatusAsync(status))" />
+        }
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-5">
+        <label for="account-search" class="form-label">Search</label>
+        <input id="account-search" class="form-control" type="search" placeholder="Search debtor or creditor"
+               @bind="search" @bind:event="oninput" @bind:after="LoadAccountsAsync" />
+    </div>
+    <div class="col-md-4 col-lg-3">
+        <label for="account-status" class="form-label">Status</label>
+        <select id="account-status" class="form-select" @bind="statusCode" @bind:after="LoadAccountsAsync">
+            <option value="">All statuses</option>
+            @foreach (var status in AccountStatus.All)
+            {
+                <option value="@status.Code">@status.Name</option>
+            }
+        </select>
+    </div>
+</div>
+
+@if (accounts == null)
+{
+    <p class="text-body-secondary">Loading...</p>
+}
+else if (accounts.Count == 0)
+{
+    <p class="text-body-secondary">No accounts match.</p>
+}
+else
+{
+    <AccountsGrid Accounts="accounts" />
+}
+
+@code {
+    private List<AccountDTO>? accounts;
+    private DashboardDTO? dashboard;
+
+    private string search = string.Empty;
+    private string statusCode = string.Empty;
+
+    // Counts each load so a slow, older response can't overwrite a newer one while typing
+    private int loadVersion;
+
+    // The open statuses get a card; Paid and Closed don't need one on a collections dashboard
+    private static readonly AccountStatus[] CardStatuses =
+        [AccountStatus.Placed, AccountStatus.DemandSent, AccountStatus.PaymentPlan, AccountStatus.SuitFiled, AccountStatus.Judgment];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Independent requests, so start both and wait for both instead of one after the other
+        var dashboardTask = Api.GetDashboardAsync();
+        await LoadAccountsAsync();
+        dashboard = await dashboardTask;
+    }
+
+    private async Task LoadAccountsAsync()
+    {
+        var version = ++loadVersion;
+        var results = await Api.GetAccountsAsync(search, statusCode);
+
+        if (version == loadVersion)
+            accounts = results;
+    }
+
+    // Uses the same statusCode as the dropdown, so the two stay in sync.
+    // Clicking the selected card again clears the filter.
+    private async Task FilterByStatusAsync(AccountStatus status)
+    {
+        statusCode = statusCode == status.Code ? string.Empty : status.Code;
+        await LoadAccountsAsync();
+    }
+
+    // A status with no accounts isn't in the API's list, so show it as 0 rather than leaving a gap
+    private StatusSummaryDTO SummaryFor(AccountStatus status) =>
+        dashboard?.ByStatus.FirstOrDefault(s => s.StatusCode == status.Code)
+        ?? new StatusSummaryDTO(status.Code, status.Name, 0, 0);
+}

@@ -1,0 +1,17 @@
+@using Microsoft.AspNetCore.Components.QuickGrid
+
+@* Theme="none" turns off QuickGrid's own styling so Bootstrap's .table applies (see app.css) *@
+<div class="table-responsive border rounded">
+    <QuickGrid Items="Payments.AsQueryable()" Theme="none" Class="table align-middle">
+        <PropertyColumn Property="@(p => p.DatePaid)" Title="Date" Format="MM/dd/yyyy" Sortable="true"
+                        IsDefaultSortColumn="true" InitialSortDirection="SortDirection.Descending" />
+        <PropertyColumn Property="@(p => p.Amount)" Title="Amount" Format="C" Sortable="true" />
+        <PropertyColumn Property="@(p => p.FirmFee)" Title="Firm fee" Format="C" Sortable="true" />
+        <PropertyColumn Property="@(p => p.Method)" Title="Method" Sortable="true" />
+    </QuickGrid>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public List<PaymentDTO> Payments { get; set; } = [];
+}

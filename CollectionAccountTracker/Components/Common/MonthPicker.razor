@@ -1,0 +1,27 @@
+@* Prev / month input / Next. Reports the chosen month (always the 1st of the month) to the parent. *@
+<div class="d-flex flex-wrap align-items-center gap-2">
+    <button type="button" class="btn btn-outline-secondary" @onclick="() => ChangeMonth(-1)">‹ Prev</button>
+    <label for="month-picker-input" class="mx-1">Month</label>
+    <input id="month-picker-input" type="month" class="form-control w-auto"
+           value="@Month.ToString("yyyy-MM")" @onchange="OnInputChanged" />
+    <button type="button" class="btn btn-outline-secondary" @onclick="() => ChangeMonth(1)">Next ›</button>
+</div>
+
+@code {
+    [Parameter]
+    public DateTime Month { get; set; } = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+    [Parameter]
+    public EventCallback<DateTime> MonthChanged { get; set; }
+
+    private Task ChangeMonth(int months) => SetMonth(Month.AddMonths(months));
+
+    private Task OnInputChanged(ChangeEventArgs e) =>
+        DateTime.TryParse($"{e.Value}-01", out var month) ? SetMonth(month) : Task.CompletedTask;
+
+    private async Task SetMonth(DateTime month)
+    {
+        Month = new DateTime(month.Year, month.Month, 1);
+        await MonthChanged.InvokeAsync(Month);
+    }
+}

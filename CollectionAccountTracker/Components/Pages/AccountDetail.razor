@@ -1,0 +1,168 @@
+@page "/accounts/{AccountId:int}"
+@* prerender: false so the account loads once instead of twice (see Accounts.razor) *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AccountAPIClient Api
+@using CollectionAccountTracker.Components.Common
+@using CollectionAccountTracker.Components.Feature
+@using CollectionAccountTracker.Data
+@using CollectionAccountTracker.Models
+
+<a href="accounts" class="link-secondary text-decoration-none d-inline-block mb-3">← Back to accounts</a>
+
+@if (account == null)
+{
+    <PageTitle>@(loaded ? "Account not found" : "Account")</PageTitle>
+
+    @if (loaded)
+    {
+        <h1 class="fw-bold mb-2">Account not found</h1>
+        <p>No account exists with ID @AccountId.</p>
+    }
+    else
+    {
+        <p class="text-body-secondary">Loading...</p>
+    }
+    return;
+}
+
+<PageTitle>@account.DebtorName</PageTitle>
+
+<h1 class="fw-bold mb-2">@account.DebtorName</h1>
+
+<div class="d-flex flex-wrap align-items-center column-gap-5 row-gap-2 mb-3">
+    <span><strong>Creditor:</strong> @account.CreditorName</span>
+    <span><strong>Placed:</strong> @account.DatePlaced.ToString("MM/dd/yyyy")</span>
+    <span><strong>Status:</strong> <StatusBadge Text="@account.StatusName" /></span>
+    <span><strong>Contingency fee:</strong> @account.ContingencyFee.ToString("0.##")%</span>
+</div>
+
+<div class="row row-cols-1 row-cols-sm-2 g-3 mb-4">
+    <StatCard StatTitle="Remaining balance" StatBalance="@account.Balance" />
+    <StatCard StatTitle="Total paid" StatBalance="@account.TotalPaid" />
+</div>
+
+<section class="card card-body mb-4">
+    @if (account.Balance <= 0)
+    {
+        <p class="fw-semibold mb-0">This account is paid in full.</p>
+    }
+    else
+    {
+        <h2 class="h4 mb-3">Post a payment</h2>
+
+        @* CreatePaymentDTO is the API's request body too, so the form and the API check the same rules *@
+        <EditForm Model="paymentForm" OnValidSubmit="PostPaymentAsync">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="alert alert-danger ps-4" />
+
+            <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                    <label for="payment-amount" class="form-label">Amount</label>
+                    <InputNumber id="payment-amount" class="form-control" placeholder="0.00" step="0.01"
+                                 @bind-Value="paymentForm.Amount" @oninput="PreviewFirmFee" />
+                </div>
+                <div class="col-sm-6">
+                    <label for="payment-method" class="form-label">Method</label>
+                    <InputSelect id="payment-method" class="form-select" @bind-Value="paymentForm.Method">
+                        <option value="">Select...</option>
+                        @foreach (var method in Enum.GetValues<PaymentMethod>())
+                        {
+                            <option value="@method">@method</option>
+                        }
+                    </InputSelect>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-dark px-4 fw-semibold" disabled="@isPosting">Post payment</button>
+        </EditForm>
+
+        <p class="mt-3 mb-0">Firm fee on this payment: @FirmFeeFor(previewAmount).ToString("C")</p>
+    }
+
+    <div class="alert alert-primary mt-3 mb-0">
+        <div><strong>Firm fee</strong> = payment amount × @account.ContingencyFee.ToString("0.##")% contingency fee</div>
+        @if (account.Balance > 0)
+        {
+            <div class="mt-1">
+                @previewAmount.ToString("C") × @account.ContingencyFee.ToString("0.##")% = @FirmFeeFor(previewAmount).ToString("C")
+                kept by the firm, @((previewAmount - FirmFeeFor(previewAmount)).ToString("C")) remitted to @account.CreditorName
+            </div>
+        }
+        else
+        {
+            <div>The rest of each payment is remitted to @account.CreditorName.</div>
+        }
+    </div>
+
+    @if (resultMessage != null)
+    {
+        <div class="alert @(resultIsError ? "alert-danger" : "alert-success") mt-3 mb-0" role="status">
+            @resultMessage
+        </div>
+    }
+</section>
+
+<h2 class="h4 mb-3">Payment history</h2>
+
+@if (account.Payments.Count == 0)
+{
+    <p class="text-body-secondary">No payments yet.</p>
+}
+else
+{
+    <PaymentsGrid Payments="account.Payments" />
+}
+
+@code {
+    [Parameter]
+    public int AccountId { get; set; }
+
+    private AccountDetailDTO? account;
+    private bool loaded;
+    private CreatePaymentDTO paymentForm = new();
+    private decimal previewAmount;
+    private bool isPosting;
+    private string? resultMessage;
+    private bool resultIsError;
+
+    // OnParametersSetAsync (not OnInitializedAsync) so the page reloads if the URL's id changes
+    // while the page stays open
+    protected override async Task OnParametersSetAsync() => await LoadAccountAsync();
+
+    private async Task LoadAccountAsync()
+    {
+        account = await Api.GetAccountAsync(AccountId);
+        loaded = true;
+    }
+
+    // Preview only, so the user sees the fee while typing. The API calculates the real fee
+    // with the same FeeCalculator when the payment is saved.
+    private decimal FirmFeeFor(decimal amount) =>
+        account == null ? 0 : FeeCalculator.FirmFee(amount, account.ContingencyFee);
+
+    private void PreviewFirmFee(ChangeEventArgs e) =>
+        previewAmount = decimal.TryParse(e.Value?.ToString(), out var amount) ? amount : 0;
+
+    // Business rules like "not more than the balance" are checked by the API, not here,
+    // so there's one source of truth and the API's message is shown as-is
+    private async Task PostPaymentAsync()
+    {
+        isPosting = true;
+        var amount = paymentForm.Amount;
+
+        var error = await Api.AddPaymentAsync(AccountId, paymentForm);
+
+        resultIsError = error != null;
+        resultMessage = error ?? $"Payment of {amount:C} posted.";
+
+        if (error == null)
+        {
+            paymentForm = new();
+            previewAmount = 0;
+        }
+
+        // Reload so balance, total paid, history and status (e.g. Paid) all come from the server
+        await LoadAccountAsync();
+        isPosting = false;
+    }
+}

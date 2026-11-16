@@ -1,0 +1,54 @@
+﻿@page "/remittance"
+@* prerender: false so the report loads once instead of twice (see Accounts.razor) *@
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject AccountAPIClient Api
+@using CollectionAccountTracker.Components.Common
+@using CollectionAccountTracker.Components.Feature
+
+<PageTitle>Remittance</PageTitle>
+
+<h1 class="fw-bold">Monthly remittance</h1>
+<p class="text-body-secondary mb-4">
+    What was collected for each creditor this month, the firm's contingency fee, and the net amount owed to the creditor.
+</p>
+
+<div class="mb-4">
+    @* MonthPicker only reports the chosen month; this page decides to reload the report *@
+    <MonthPicker @bind-Month="month" @bind-Month:after="LoadReportAsync" />
+</div>
+
+@if (report == null)
+{
+    <p class="text-body-secondary">Loading...</p>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-sm-3 g-3 mb-4">
+        <StatCard StatTitle="Collected" StatBalance="@report.TotalCollected" />
+        <StatCard StatTitle="Firm fee" StatBalance="@report.TotalFirmFee" />
+        <StatCard StatTitle="Net to creditors" StatBalance="@report.TotalNetToCreditor" />
+    </div>
+
+    @if (report.Lines.Count == 0)
+    {
+        <p class="text-body-secondary">No payments were collected in @month.ToString("MMMM yyyy").</p>
+    }
+    else
+    {
+        <RemittanceGrid Report="report" />
+    }
+}
+
+@code {
+    private DateTime month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private RemittanceReportDTO? report;
+
+    protected override async Task OnInitializedAsync() => await LoadReportAsync();
+
+    private async Task LoadReportAsync()
+    {
+        // Cleared first so "Loading..." shows while switching months instead of the old month's numbers
+        report = null;
+        report = await Api.GetRemittanceAsync(month.Year, month.Month);
+    }
+}

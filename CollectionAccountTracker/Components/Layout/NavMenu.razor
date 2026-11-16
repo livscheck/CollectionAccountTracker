@@ -1,7 +1,6 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">CollectionAccountTracker</a>
-    </div>
+﻿@* px-3 here + px-3 on the brand = the same 2rem inset as the menu links (nav-item px-3 + nav-link padding) *@
+<div class="top-row navbar px-3">
+    <a class="navbar-brand fs-6 fw-bold text-wrap px-3 me-0" href="accounts">Collection Account Tracker</a>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
@@ -9,22 +8,30 @@
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+            @* Prefix match (the default), so Accounts stays highlighted on /accounts/5 too *@
+            <NavLink class="nav-link" href="accounts">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Accounts
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
+            <NavLink class="nav-link" href="remittance">
+                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Remittance
             </NavLink>
         </div>
 
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
+            <NavLink class="nav-link" href="backend">
+                <span class="bi bi-code-slash-nav-menu" aria-hidden="true"></span> How It Works
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="about">
+                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> About
             </NavLink>
         </div>
     </nav>
 </div>
 
+ 

@@ -1,0 +1,28 @@
+@using Microsoft.AspNetCore.Components.QuickGrid
+@using CollectionAccountTracker.Components.Common
+
+@* Theme="none" turns off QuickGrid's own styling so Bootstrap's .table applies (see app.css) *@
+<div class="table-responsive border rounded">
+    <QuickGrid Items="Accounts.AsQueryable()" Theme="none" Class="table table-hover align-middle">
+        <TemplateColumn Title="Debtor" SortBy="@(GridSort<AccountDTO>.ByAscending(a => a.DebtorName))">
+            <a href="accounts/@context.Id" class="link-dark">@context.DebtorName</a>
+        </TemplateColumn>
+        <PropertyColumn Property="@(a => a.CreditorName)" Title="Creditor" Sortable="true" />
+        <PropertyColumn Property="@(a => a.Balance)" Title="Balance" Format="C" Sortable="true"
+                        IsDefaultSortColumn="true" InitialSortDirection="SortDirection.Descending" />
+        <PropertyColumn Property="@(a => a.PaymentCount)" Title="Payments" Sortable="true" />
+        <TemplateColumn Title="Last payment" SortBy="@(GridSort<AccountDTO>.ByAscending(a => a.LastPaymentDate))">
+            @(context.LastPaymentDate?.ToString("MM/dd/yyyy") ?? "—")
+        </TemplateColumn>
+        <TemplateColumn Title="Status" SortBy="@(GridSort<AccountDTO>.ByAscending(a => a.StatusName))">
+            <StatusBadge Text="@context.StatusName" />
+        </TemplateColumn>
+    </QuickGrid>
+</div>
+
+@code {
+    // Rows come from the page, which loads them once from the API. The grid never calls the API
+    // itself, so there's no request per row (no N+1 over HTTP).
+    [Parameter, EditorRequired]
+    public List<AccountDTO> Accounts { get; set; } = [];
+}

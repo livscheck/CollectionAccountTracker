@@ -1,0 +1,75 @@
+@* Plain table instead of QuickGrid, because QuickGrid can't render a totals row. *@
+<div class="table-responsive border rounded">
+    <table class="table align-middle">
+        <thead>
+            <tr>
+                @foreach (var column in Columns)
+                {
+                    <th aria-sort="@AriaSort(column)">
+                        <button type="button" class="btn btn-link p-0 fw-semibold text-reset text-decoration-none" @onclick="() => SortBy(column)">
+                            @column.Title
+                            @if (column == sortColumn)
+                            {
+                                <span aria-hidden="true">@(sortAscending ? "↑" : "↓")</span>
+                            }
+                        </button>
+                    </th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var line in SortedLines)
+            {
+                <tr @key="line.CreditorId">
+                    <td>@line.CreditorName</td>
+                    <td>@line.PaymentCount</td>
+                    <td>@line.Collected.ToString("C")</td>
+                    <td>@line.FirmFee.ToString("C")</td>
+                    <td>@line.NetToCreditor.ToString("C")</td>
+                </tr>
+            }
+        </tbody>
+        <tfoot class="table-group-divider fw-bold">
+            <tr>
+                <td>Total</td>
+                <td>@Report.TotalPaymentCount</td>
+                <td>@Report.TotalCollected.ToString("C")</td>
+                <td>@Report.TotalFirmFee.ToString("C")</td>
+                <td>@Report.TotalNetToCreditor.ToString("C")</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+@code {
+    // The whole report, so the totals row shows the API's totals instead of re-adding them here
+    [Parameter, EditorRequired]
+    public RemittanceReportDTO Report { get; set; } = default!;
+
+    private record GridColumn(string Title, Func<RemittanceLineDTO, IComparable> SortKey);
+
+    private static readonly GridColumn[] Columns =
+    [
+        new("Creditor", l => l.CreditorName),
+        new("Payments", l => l.PaymentCount),
+        new("Collected", l => l.Collected),
+        new("Firm fee", l => l.FirmFee),
+        new("Net to creditor", l => l.NetToCreditor)
+    ];
+
+    private GridColumn sortColumn = Columns[0];
+    private bool sortAscending = true;
+
+    private IEnumerable<RemittanceLineDTO> SortedLines => sortAscending
+        ? Report.Lines.OrderBy(sortColumn.SortKey)
+        : Report.Lines.OrderByDescending(sortColumn.SortKey);
+
+    private void SortBy(GridColumn column)
+    {
+        sortAscending = column == sortColumn ? !sortAscending : true;
+        sortColumn = column;
+    }
+
+    private string? AriaSort(GridColumn column) =>
+        column != sortColumn ? null : sortAscending ? "ascending" : "descending";
+}
