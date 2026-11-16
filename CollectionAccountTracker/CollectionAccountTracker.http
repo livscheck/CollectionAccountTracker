@@ -1,0 +1,97 @@
+# Requests for every API endpoint. Run the app first (`dotnet run`), then click "Send Request"
+# above any request (VS Code: REST Client extension; Rider and Visual Studio: built in).
+# `dotnet run` uses the "http" profile from Properties/launchSettings.json.
+# With `dotnet run --launch-profile https`, use https://localhost:7238 instead.
+
+@host = http://localhost:5156
+
+
+########## ACCOUNTS ##########
+
+### All accounts, highest balance first
+GET {{host}}/api/accounts
+
+### Search debtor or creditor name
+GET {{host}}/api/accounts?search=smith
+
+### Filter by status code (PLACED, DEMAND, PLAN, SUIT, JUDGMT, PAID, CLOSED; any case)
+GET {{host}}/api/accounts?status=suit
+
+### Search and filter together
+GET {{host}}/api/accounts?search=lakeshore&status=PLAN
+
+### 400: unknown status code (the message lists the valid ones)
+GET {{host}}/api/accounts?status=XYZ
+
+### One account with its payments, newest first
+GET {{host}}/api/accounts/1
+
+### 404: no such account
+GET {{host}}/api/accounts/99999
+
+### Stat cards: count and remaining balance per status, plus collected this month
+GET {{host}}/api/accounts/dashboard
+
+
+########## PAYMENTS ##########
+
+### 201: post a payment, then rerun GET /api/accounts/1 and this month's remittance to see it
+POST {{host}}/api/accounts/1/payments
+Content-Type: application/json
+
+{ "amount": 100.00, "method": "Check" }
+
+### 400: more than the remaining balance
+POST {{host}}/api/accounts/1/payments
+Content-Type: application/json
+
+{ "amount": 999999.00, "method": "Card" }
+
+### 400: amount must be at least $0.01 (CreatePaymentDTO validation)
+POST {{host}}/api/accounts/1/payments
+Content-Type: application/json
+
+{ "amount": 0, "method": "Check" }
+
+### 400: method missing (CreatePaymentDTO validation)
+POST {{host}}/api/accounts/1/payments
+Content-Type: application/json
+
+{ "amount": 50.00 }
+
+### 400: method isn't a PaymentMethod (Cash, Check, Card, Transfer, Other)
+POST {{host}}/api/accounts/1/payments
+Content-Type: application/json
+
+{ "amount": 50.00, "method": "Bitcoin" }
+
+### 404: payment for an account that doesn't exist
+POST {{host}}/api/accounts/99999/payments
+Content-Type: application/json
+
+{ "amount": 50.00, "method": "Check" }
+
+### Pay off exactly → status changes to Paid
+# First GET /api/accounts/2 and copy its "balance" into the amount below.
+POST {{host}}/api/accounts/2/payments
+Content-Type: application/json
+
+{ "amount": 0.00, "method": "Transfer" }
+
+
+########## REMITTANCE ##########
+
+### This month (year and month default to today)
+GET {{host}}/api/remittance
+
+### A specific month (change to last month to compare)
+GET {{host}}/api/remittance?year=2026&month=10
+
+### A month with no payments → 200 with an empty "lines" list
+GET {{host}}/api/remittance?year=2020&month=1
+
+### 400: month out of range
+GET {{host}}/api/remittance?year=2026&month=13
+
+### 400: year out of range
+GET {{host}}/api/remittance?year=1999&month=6
